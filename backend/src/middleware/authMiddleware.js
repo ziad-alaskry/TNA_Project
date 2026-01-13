@@ -1,24 +1,32 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET;
+// Fallback secret for development stability
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 
 const authorize = (roles = []) => {
     return (req, res, next) => {
-        const token = req.headers['authorization']?.split(' ')[1];
+        // Support both lowercase and CamelCase header keys
+        const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+        const token = authHeader?.split(' ')[1];
 
-        if (!token) return res.status(401).json({ error: "Access Denied. No token provided." });
+        if (!token) {
+            return res.status(401).json({ error: "Access Denied. No token provided." });
+        }
 
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
-            req.user = decoded; // Adds {id, role} to the request object
+            
+            // Injects {id, role, name} into the rest of the request chain
+            req.user = decoded; 
 
             // Role Check
             if (roles.length && !roles.includes(decoded.role)) {
-                return res.status(403).json({ error: "Unauthorized. Role mismatch." });
+                return res.status(403).json({ error: `Unauthorized. Requires: ${roles.join(',')}` });
             }
 
             next();
         } catch (err) {
-            res.status(400).json({ error: "Invalid Token." });
+            console.error("JWT Verify Error:", err.message);
+            return res.status(401).json({ error: "Invalid or Expired Token." });
         }
     };
 };

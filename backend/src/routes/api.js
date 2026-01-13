@@ -1,51 +1,55 @@
 // Telling Express how to reach functionalities 
 const express = require('express');
 const router = express.Router();
-const personController = require('../controllers/personController');
+
+// Controllers
 const tnaController = require('../controllers/tnaController');
 const addressController = require('../controllers/addressController');
 const bindingController = require('../controllers/bindingController');
-const resolverController = require('../controllers/resolverController')
-const shipmentController = require('../controllers/shipmentController')
-const authController = require('../controllers/authController')
-const {authorize} = require('../middleware/authMiddleware')
+const resolverController = require('../controllers/resolverController');
+const shipmentController = require('../controllers/shipmentController');
+const authController = require('../controllers/authController');
 
+// Middleware
+const { authorize } = require('../middleware/authMiddleware');
 
-// Person Routes 
-router.post('/persons', personController.createPerson);
-router.get('/persons', personController.getAllPersons);
-
-// TNA Routes 
-
-router.get('/tna/active/:visitor_id', tnaController.getActiveTna);
-
-// Address Routes
-router.post('/addresses/register',addressController.registerAddressVariant);
-router.get('/addresses/owner/:owner_id', addressController.getOWnerAddresses);
-
-// Binding Routes
-router.post('/bindings/link', bindingController.createBinding);
-router.post('/binding/unlink', bindingController.unlinkBinding);
-
-// Carrier Routes
-router.post('/resolve', resolverController.resolveTna);
-router.post('/shipments/update', shipmentController.updateShipmentStatus);
-
-// Auth Routes (Public)
+// ==========================================
+// PUBLIC ROUTES
+// ==========================================
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login); 
 
-// Visitor Only
+// ==========================================
+// VISITOR ROUTES (Role-Protected)
+// ==========================================
+// Request a new TNA (Enforces Max 5 logic in controller)
 router.post('/tna/request', authorize(['VISITOR']), tnaController.requestTna);
+
+// Fetch all active TNAs for the logged-in visitor
+router.get('/tna/active/:visitor_id', authorize(['VISITOR']), tnaController.getActiveTna);
+
+// Remove link between TNA and physical address
 router.post('/bindings/unlink', authorize(['VISITOR']), bindingController.unlinkBinding);
 
-// Owner Only
+// ==========================================
+// OWNER ROUTES (Role-Protected)
+// ==========================================
+// Register a new address variant (e.g., Unit 101)
 router.post('/addresses/register', authorize(['OWNER']), addressController.registerAddressVariant);
-router.post('/bindings/link', authorize(['OWNER']), bindingController.createBinding);
+
+// Get list of properties owned by the logged-in user
 router.get('/addresses/my-properties', authorize(['OWNER']), addressController.getMyProperties);
 
-// Carrier Only
+// Link a Visitor's TNA to an Owner's address variant
+router.post('/bindings/link', authorize(['OWNER']), bindingController.createBinding);
+
+// ==========================================
+// CARRIER ROUTES (Role-Protected)
+// ==========================================
+// Convert TNA code to physical destination
 router.post('/resolve', authorize(['CARRIER']), resolverController.resolveTna);
+
+// Update shipment status (Triggers Transit-Lock)
 router.post('/shipments/update', authorize(['CARRIER']), shipmentController.updateShipmentStatus);
 
 module.exports = router;
