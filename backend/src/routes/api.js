@@ -16,7 +16,7 @@ router.post('/persons', personController.createPerson);
 router.get('/persons', personController.getAllPersons);
 
 // TNA Routes 
-router.post('/tna/request', tnaController.requestTna);
+
 router.get('/tna/active/:visitor_id', tnaController.getActiveTna);
 
 // Address Routes
@@ -42,6 +42,7 @@ router.post('/bindings/unlink', authorize(['VISITOR']), bindingController.unlink
 // Owner Only
 router.post('/addresses/register', authorize(['OWNER']), addressController.registerAddressVariant);
 router.post('/bindings/link', authorize(['OWNER']), bindingController.createBinding);
+router.get('/addresses/my-properties', authorize(['OWNER']), addressController.getMyProperties);
 
 // Carrier Only
 router.post('/resolve', authorize(['CARRIER']), resolverController.resolveTna);

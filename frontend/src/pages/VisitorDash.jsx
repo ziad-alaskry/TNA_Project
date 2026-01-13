@@ -1,116 +1,76 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { PlusCircle, Clipboard, CheckCircle, Unlock } from 'lucide-react';
+import { PlusCircle, Clipboard, CheckCircle, Unlock, Layers } from 'lucide-react';
 
 const VisitorDash = () => {
-  const [tna, setTna] = useState(null);
+  const [tnas, setTnas] = useState([]); // Changed from single tna to array
   const [loading, setLoading] = useState(false);
-  const [visitorId] = useState(1); // Mocked logged-in user ID
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  // Utility for API calls with Auth Header
+  const api = axios.create({
+    baseURL: 'http://localhost:5000/api/v1',
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+  });
+
+  const fetchTnas = async () => {
+    try {
+      const res = await api.get(`/tna/active/${user.id}`);
+      // Assuming backend returns an array of active TNAs now
+      setTnas(Array.isArray(res.data) ? res.data : [res.data]);
+    } catch (err) { setTnas([]); }
+  };
+
+  useEffect(() => { fetchTnas(); }, []);
 
   const handleRequestTna = async () => {
+    if (tnas.length >= 5) return alert("Maximum 5 TNAs reached.");
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/v1/tna/request', {
-        visitor_id: visitorId
-      });
-      setTna(response.data.tna_code);
+      await api.post('/tna/request');
+      fetchTnas();
     } catch (err) {
-      const msg = err.response?.data?.error || "Cannot connect to server";
-      alert("Error: " + msg);
-    } finally {
-      setLoading(false);
-    }
+      alert("Error: " + (err.response?.data?.error || "Limit Reached"));
+    } finally { setLoading(false); }
   };
 
-  const handleUnlink = async () => {
-    if (!window.confirm("Are you sure? This will remove your connection to the physical address.")) return;
-    
-    setLoading(true);
+  const handleUnlink = async (tnaCode) => {
+    if (!window.confirm("Unlink this address?")) return;
     try {
-      await axios.post('http://localhost:5000/api/v1/bindings/unlink', {
-        tna_code: tna
-      });
-      setTna(null);
-      alert("Address unlinked successfully.");
+      await api.post('/bindings/unlink', { tna_code: tnaCode });
+      fetchTnas();
+      alert("Unlinked!");
     } catch (err) {
-      const msg = err.response?.data?.error || "Unlinking failed";
-      alert("TRANSIT LOCK: " + msg);
-    } finally {
-      setLoading(false);
+      alert("TRANSIT LOCK: " + (err.response?.data?.error || "Failed"));
     }
-  };
-
-  useEffect(() => {
-  const fetchActiveTna = async () => {
-    try {
-      const res = await axios.get(`http://localhost:5000/api/v1/tna/active/${visitorId}`);
-      if (res.data && res.data.tna_code) {
-        setTna(res.data.tna_code);
-      }
-    } catch (err) {
-      console.log("No active TNA found for this user.");
-    }
-  };
-  fetchActiveTna();
-}, [visitorId]);
-
-  const copyToClipboard = () => {
-    if (!tna) return;
-    navigator.clipboard.writeText(tna);
-    alert("TNA Code copied!");
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-2xl font-bold text-gray-800">Your TNA</h2>
-        <p className="text-gray-500 text-sm mt-1">Temporary National Address for your stay.</p>
-
-        {!tna ? (
-          <button
-            onClick={handleRequestTna}
-            disabled={loading}
-            className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {loading ? "Issuing..." : <><PlusCircle size={20} /> Request New TNA</>}
-          </button>
-        ) : (
-          <div className="space-y-4">
-            <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 border-dashed rounded-xl text-center">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">Active TNA Code</span>
-              <div className="text-3xl font-mono font-bold text-blue-900 mt-1 select-all">
-                {tna}
-              </div>
-              <div className="flex justify-center gap-4 mt-4">
-                <button 
-                  onClick={copyToClipboard}
-                  className="text-blue-600 flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  <Clipboard size={16} /> Copy
-                </button>
-                <span className="text-green-600 flex items-center gap-1 text-sm font-medium">
-                  <CheckCircle size={16} /> Verified
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleUnlink}
-              disabled={loading}
-              className="w-full bg-red-50 text-red-600 border border-red-100 font-bold py-3 rounded-xl hover:bg-red-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-            >
-              <Unlock size={18} /> {loading ? "Processing..." : "Unlink Physical Address"}
-            </button>
-          </div>
-        )}
+    <div className="p-6 space-y-6 pb-24">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">My TNAs</h2>
+          <p className="text-gray-500 text-sm">{tnas.length} of 5 active</p>
+        </div>
+        <button onClick={handleRequestTna} disabled={loading || tnas.length >= 5}
+          className="bg-blue-600 text-white p-3 rounded-full shadow-lg active:scale-95 disabled:bg-gray-300">
+          <PlusCircle size={24} />
+        </button>
       </div>
 
-      <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-        <h4 className="font-bold text-orange-800 text-sm">Next Step:</h4>
-        <p className="text-orange-700 text-xs mt-1">
-          Share this code with an Address Owner to link your TNA to a physical location. 
-          Unlinking is disabled if a shipment is <span className="font-bold underline">IN_TRANSIT</span>.
-        </p>
+      <div className="space-y-4">
+        {tnas.length === 0 && <p className="text-center py-10 text-gray-400">No active TNAs. Click the + to start.</p>}
+        {tnas.map((item, idx) => (
+          <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3 border-gray-50">
+               <span className="text-3xl font-mono font-bold text-blue-900">{item.tna_code}</span>
+               <button onClick={() => {navigator.clipboard.writeText(item.tna_code); alert("Copied!")}} className="text-blue-500"><Clipboard size={18}/></button>
+            </div>
+            <button onClick={() => handleUnlink(item.tna_code)} className="w-full flex items-center justify-center gap-2 py-2 text-red-600 bg-red-50 rounded-xl font-bold text-sm">
+              <Unlock size={16}/> Unlink This Address
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ const initDb = () => {
 
         -- We also need to ensure TNAs have an 'is_active' status 
         -- so we can enforce the "Max 5" rule easily.
-        ALTER TABLE tnas ADD COLUMN is_active INTEGER DEFAULT 1;
+        
 
         -- 3. NA Variants: Physical addresses + 4-letter suffix
         CREATE TABLE IF NOT EXISTS na_variants (

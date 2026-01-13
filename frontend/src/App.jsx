@@ -1,48 +1,58 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { User, Home, Truck, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import Login from './pages/Login';
 import VisitorDash from './pages/VisitorDash';
 import OwnerDash from './pages/OwnerDash';
 import CarrierDash from './pages/CarrierDash';
 
-
 function App() {
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    // Attempt to load user from storage on boot
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.clear();
+      }
+    }
+    setInitializing(false);
+  }, []);
+
+  // Prevent flash of blank screen while checking localStorage
+  if (initializing) return <div className="p-10 text-center font-mono">Initializing Project A...</div>;
+
+  // 1. If no user, show Login screen
+  if (!user) {
+    return <Login onLoginSuccess={(userData) => setUser(userData)} />;
+  }
+
+  // 2. If user exists, show dashboard based on role
   return (
-    <Router>
-      <div className="min-h-screen pb-20">
-        {/* Header */}
-        <header className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-10">
-          <h1 className="text-xl font-bold ml-6"> TNA Portal</h1>
-        </header>
+    <div className="min-h-screen bg-gray-50">
+      <nav className="p-4 bg-white border-b flex justify-between items-center shadow-sm">
+        <h1 className="font-black text-blue-900 tracking-tighter">
+          PROJECT A <span className="text-xs text-gray-400 ml-2">[{user.role}]</span>
+        </h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-600">{user.name}</span>
+          <button 
+            onClick={() => { localStorage.clear(); setUser(null); }}
+            className="text-xs bg-red-50 text-red-600 px-3 py-1 rounded-lg font-bold hover:bg-red-100"
+          >
+            LOGOUT
+          </button>
+        </div>
+      </nav>
 
-        {/* Main Content Area */}
-        <main className="max-w-md mx-auto">
-          <Routes>
-            <Route path="/" element={<VisitorDash />} />
-            <Route path="/owner" element={<OwnerDash />} />
-            <Route path="/carrier" element={<CarrierDash />} />
-          </Routes>
-        </main>
-
-        {/* Bottom Mobile Navigation */}
-        <nav className="fixed max-w-full bottom-0 left-0 right-0 
-        bg-white border-t border-gray-200 flex 
-        justify-around p-3 shadow-lg lg:max-w-full lg:mx-auto">
-          <Link to="/" className="flex flex-col items-center text-gray-600 hover:text-blue-600">
-            <User size={24} />
-            <span className="text-xs">Visitor</span>
-          </Link>
-          <Link to="/owner" className="flex flex-col items-center text-gray-600 hover:text-blue-600">
-            <Home size={24} />
-            <span className="text-xs">Owner</span>
-          </Link>
-          <Link to="/carrier" className="flex flex-col items-center text-gray-600 hover:text-blue-600">
-            <Truck size={24} />
-            <span className="text-xs">Carrier</span>
-          </Link>
-        </nav>
-      </div>
-    </Router>
+      <main className="max-w-4xl mx-auto">
+        {user.role === 'VISITOR' && <VisitorDash />}
+        {user.role === 'OWNER' && <OwnerDash />}
+        {user.role === 'CARRIER' && <CarrierDash />}
+      </main>
+    </div>
   );
 }
 

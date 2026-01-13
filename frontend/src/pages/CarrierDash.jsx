@@ -3,6 +3,12 @@ import axios from 'axios';
 import { Search, MapPin, Truck, AlertTriangle, PlusCircle } from 'lucide-react';
 
 const CarrierDash = () => {
+
+  const api = axios.create({
+  baseURL: 'http://localhost:5000/api/v1',
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+});
+
   // Resolution State
   const [resolveTna, setResolveTna] = useState('');
   const [resolutionResult, setResolutionResult] = useState(null);
@@ -13,33 +19,29 @@ const CarrierDash = () => {
   const [shipTna, setShipTna] = useState('');
 
   // 1. Resolve TNA to Physical Address
-  const handleResolve = async () => {
-    setResolveError(null);
-    setResolutionResult(null);
-    try {
-      const res = await axios.post('http://localhost:5000/api/v1/resolve', {
-        tna_code: resolveTna.trim().toUpperCase()
-      });
-      setResolutionResult(res.data);
-    } catch (err) {
-      setResolveError(err.response?.data?.error || "Resolution Failed");
-    }
-  };
+const handleResolve = async () => {
+  try {
+    const res = await api.post('/resolve', { tna_code: resolveTna.trim().toUpperCase() });
+    setResolutionResult(res.data);
+  } catch (err) {
+    setResolveError(err.response?.data?.error || "Resolution Failed");
+  }
+};
 
   // 2. Create Shipment (Triggers Transit-Lock)
-  const handleCreateShipment = async () => {
-    try {
-      await axios.post('http://localhost:5000/api/v1/shipments/update', {
-        tracking_number: trackingNum,
-        tna_code: shipTna.trim().toUpperCase()
-      });
-      alert("Shipment Started: Transit-Lock is now ACTIVE for this TNA.");
-      setTrackingNum('');
-      setShipTna('');
-    } catch (err) {
-      alert("Failed: " + (err.response?.data?.error || "Server Error"));
-    }
-  };
+const handleCreateShipment = async () => {
+  try {
+    await api.post('/shipments/update', {
+      tracking_number: trackingNum,
+      tna_code: shipTna.trim().toUpperCase(),
+      status: 'IN_TRANSIT'
+    });
+    alert("Shipment Started: Transit-Lock Active.");
+    // ... clear inputs ...
+  } catch (err) {
+    alert("Failed: " + (err.response?.data?.error || "Error"));
+  }
+};
 
   return (
     <div className="p-6 space-y-8 pb-24">

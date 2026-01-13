@@ -49,4 +49,14 @@ const getOWnerAddresses = (req,res) => {
     res.json(rows);
 }
 
-module.exports = {registerAddressVariant, getOWnerAddresses};
+const getMyProperties = (req, res) => {
+    const owner_id = req.user.id; // From JWT
+    try {
+        const rows = db.prepare('SELECT * FROM na_variants WHERE owner_id = ?').all(owner_id);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch properties" });
+    }
+};
+
+module.exports = {registerAddressVariant, getOWnerAddresses, getMyProperties};

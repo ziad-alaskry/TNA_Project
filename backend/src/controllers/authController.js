@@ -3,29 +3,32 @@ const jwt = require('jsonwebtoken')
 const { db } = require('../config/db');
 
 const register = async (req, res) => {
-    const { name, email, password, role } = req.body;
+    // Add id_number to the destructuring
+    const { name, email, password, role, id_number } = req.body;
 
-    if (!name || !email || !password || !role) {
-        return res.status(400).json({ error: "All fields are required." });
+    // Validate that id_number is present
+    if (!name || !email || !password || !role || !id_number) {
+        return res.status(400).json({ error: "All fields including ID Number are required." });
     }
 
     try {
         const password_hash = await bcrypt.hash(password, 10);
         
         const stmt = db.prepare(`
-            INSERT INTO persons (name, email, password_hash, role) 
-            VALUES (?, ?, ?, ?)
+            INSERT INTO persons (name, email, password_hash, role, id_number) 
+            VALUES (?, ?, ?, ?, ?)
         `);
         
-        const info = stmt.run(name, email, password_hash, role.toUpperCase());
+        const info = stmt.run(name, email, password_hash, role.toUpperCase(), id_number);
         
         res.status(201).json({ 
             message: "User registered successfully", 
             userId: info.lastInsertRowid 
         });
     } catch (err) {
+        console.error("Registration Error:", err.message); // This helps you see the exact SQL error in terminal
         if (err.message.includes('UNIQUE')) {
-            return res.status(400).json({ error: "Email already exists." });
+            return res.status(400).json({ error: "Email or ID Number already exists." });
         }
         res.status(500).json({ error: "Registration failed." });
     }

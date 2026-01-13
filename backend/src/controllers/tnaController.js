@@ -1,59 +1,48 @@
 const {db} = require('../config/db');
 const {generateTnaCode} = require('../utils/tnaGenerator');
 
-const requestTna = (req,res) => {
-// 1. Force conversion to Integer to handle "1.0" or string issues
-    const visitor_id = parseInt(req.body.visitor_id);
+const requestTna = (req, res) => {
+    const visitor_id = req.user.id; // Taken from the JWT token, not the body!
 
-        try {
-        // 2. Query the database first
-        const person = db.prepare('SELECT role FROM persons WHERE id = ?').get(visitor_id);
-        
-        // 3. NOW check if the result exists
-        if (!person) {
-            console.log(`⚠️ Visitor ID ${visitor_id} not found.`);
-            return res.status(404).json({ error: "Visitor ID not found in database." });
+    try {
+        // 1. Check current active count
+        const activeCount = db.prepare(`
+            SELECT COUNT(*) as count FROM tnas 
+            WHERE visitor_id = ? AND status = 'ACTIVE'
+        `).get(visitor_id);
+
+        if (activeCount.count >= 5) {
+            return res.status(400).json({ 
+                error: "Limit Reached. You can only have 5 active TNAs at a time." 
+            });
         }
 
-        // 4. Validate role
-        if (person.role !== 'VISITOR') {
-            return res.status(403).json({ error: "Only visitors can request a TNA" });
-        }
-
-        // 5. Success Path: Generate and Insert
+        // 2. Proceed with generation
         const tnaCode = generateTnaCode();
         const stmt = db.prepare('INSERT INTO tnas (tna_code, visitor_id) VALUES (?, ?)');
         stmt.run(tnaCode, visitor_id);
 
-        console.log(`✅ TNA Issued: ${tnaCode} for Visitor ${visitor_id}`);
         res.status(201).json({ tna_code: tnaCode });
-
     } catch (err) {
-        console.error("❌ Internal Logic Error:", err);
-        res.status(500).json({ error: "Database error during TNA issuance" });
+        res.status(500).json({ error: "Failed to issue TNA." });
     }
 };
 
 const getActiveTna = (req, res) => {
-    const { visitor_id } = req.params;
+    const visitor_id = req.params.visitor_id; // Still use param for now or req.user.id
     try {
-        // We sort by id DESC to get the most recent TNA issued to this visitor
-        const row = db.prepare(`
+        // Return ALL active TNAs for this visitor
+        const rows = db.prepare(`
             SELECT tna_code FROM tnas 
-            WHERE visitor_id = ? 
-            ORDER BY id DESC LIMIT 1
-        `).get(visitor_id);
+            WHERE visitor_id = ? AND status = 'ACTIVE'
+            ORDER BY id DESC
+        `).all(visitor_id);
         
-        if (row) {
-            res.json(row);
-        } else {
-            res.status(404).json({ error: "No TNA found" });
-        }
+        res.json(rows); // Now returns an array [ {tna_code: '...'}, ... ]
     } catch (err) {
-        console.error("Database Error:", err.message);
         res.status(500).json({ error: "Database error" });
     }
 };
 
-module.exports = { requestTna, getActiveTna };
+module.exports = { requestTna, getActiveTna};
 
