@@ -22,7 +22,7 @@ function App() {
   }, []);
 
   // Prevent flash of blank screen while checking localStorage
-  if (initializing) return <div className="p-10 text-center font-mono">Initializing Project A...</div>;
+  if (initializing) return <div className="p-10 text-center font-mono">Initializing Project TNA...</div>;
 
   // 1. If no user, show Login screen
   if (!user) {
@@ -34,7 +34,7 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <nav className="p-4 bg-white border-b flex justify-between items-center shadow-sm">
         <h1 className="font-black text-blue-900 tracking-tighter">
-          PROJECT A <span className="text-xs text-gray-400 ml-2">[{user.role}]</span>
+          PROJECT TNA <span className="text-xs text-gray-400 ml-2">[{user.role}]</span>
         </h1>
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium text-gray-600">{user.name}</span>

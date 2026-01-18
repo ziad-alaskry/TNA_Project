@@ -10,12 +10,14 @@ const resolverController = require('../controllers/resolverController');
 const shipmentController = require('../controllers/shipmentController');
 const authController = require('../controllers/authController');
 
+
 // Middleware
 const { authorize } = require('../middleware/authMiddleware');
 
 // ==========================================
 // PUBLIC ROUTES
 // ==========================================
+
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login); 
 
@@ -29,6 +31,8 @@ router.post('/tna/request', authorize(['VISITOR']), tnaController.requestTna);
 router.get('/tna/active/:visitor_id', authorize(['VISITOR']), tnaController.getActiveTna);
 
 // Remove link between TNA and physical address
+
+
 router.post('/bindings/unlink', authorize(['VISITOR']), bindingController.unlinkBinding);
 
 // ==========================================
@@ -46,6 +50,7 @@ router.post('/bindings/link', authorize(['OWNER']), bindingController.createBind
 // ==========================================
 // CARRIER ROUTES (Role-Protected)
 // ==========================================
+
 // Convert TNA code to physical destination
 router.post('/resolve', authorize(['CARRIER']), resolverController.resolveTna);
 
