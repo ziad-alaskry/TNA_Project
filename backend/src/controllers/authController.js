@@ -155,4 +155,52 @@ const verifySecurityCode = async (req, res) => {
     }
 };
 
-module.exports = { register, login, sendOtp, verifySecurityCode };
+const resetPassword = async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+        return res.status(400).json({ error: "Email, OTP, and New Password are required." });
+    }
+
+    try {
+        // Check if OTP exists in cache
+        const cachedOtp = otpCache[email];
+
+        if (!cachedOtp) {
+            return res.status(400).json({ error: "No valid OTP found. Please request a new code." });
+        }
+
+        // Check if OTP has expired
+        if (Date.now() > cachedOtp.expiresAt) {
+            delete otpCache[email];
+            return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+        }
+
+        // Verify OTP matches
+        if (cachedOtp.otp !== otp) {
+            return res.status(401).json({ error: "Invalid security code." });
+        }
+
+        // Hash the new password
+        const password_hash = await bcrypt.hash(newPassword, 10);
+
+        // Update password in database
+        const stmt = db.prepare('UPDATE persons SET password_hash = ? WHERE email = ?');
+        const info = stmt.run(password_hash, email);
+
+        if (info.changes === 0) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        // Clean up OTP cache
+        delete otpCache[email];
+
+        res.json({ message: "Password reset successfully. You can now login with your new password." });
+
+    } catch (err) {
+        console.error('Reset Password error:', err);
+        res.status(500).json({ error: "Failed to reset password." });
+    }
+};
+
+module.exports = { register, login, sendOtp, verifySecurityCode, resetPassword };

@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Project A - Cognitive Bias Explorer API
+  title: Project A - TNA Resolver API
   version: 1.0.0
   description: API for managing Temporary Network Addresses (TNA)
 
@@ -142,6 +142,37 @@ paths:
           description: Invalid or expired OTP
         401:
           description: Invalid security code
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, newPassword]
+              properties:
+                email: { type: string, example: "visitor@test.com" }
+                otp: { type: string, example: "123456" }
+                newPassword: { type: string, example: "newpassword123" }
+      responses:
+        200:
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        400:
+          description: Invalid details or expired OTP
+        401:
+          description: Invalid security code
+        404:
+          description: User not found
 
 
   /tna/request:

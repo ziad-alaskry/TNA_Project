@@ -22,6 +22,7 @@ router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.post('/auth/send-otp', authController.sendOtp);
 router.post('/auth/verify-security-code', authController.verifySecurityCode);
+router.post('/auth/reset-password', authController.resetPassword);
 
 // ==========================================
 // 2. VISITOR ROUTES
