@@ -1,85 +1,85 @@
 const { db } = require('../config/db');
 
-// 1. Create a Binding (Link TNA to address)
-const createBinding = (req, res) => {
-    const { tna_code, variant_id } = req.body;
+exports.createBinding = (req, res) => {
+    const { tna_code, unit_id } = req.body;
+    const userId = req.user.id;
 
     try {
-        // 1. Find the TNA
-        const tna = db.prepare('SELECT id FROM tnas WHERE tna_code = ?').get(tna_code);
-        if (!tna) return res.status(404).json({ error: "TNA code not found." });
+        // 1. Verify TNA ownership
+        const tna = db.prepare('SELECT id FROM tnas WHERE tna_code = ? AND visitor_id = ?').get(tna_code, userId);
+        if (!tna) return res.status(404).json({ error: "TNA not found or unauthorized." });
 
-        // 2. NEW CHECK: Ensure the PHYSICAL ADDRESS (variant) isn't already occupied by someone else
-        const addressOccupied = db.prepare('SELECT id FROM bindings WHERE variant_id = ? AND is_active = 1').get(variant_id);
-        if (addressOccupied) {
-            return res.status(400).json({ error: "This physical address is already linked to another active TNA." });
-        }
+        // 2. Check if Unit exists and is available
+        const unit = db.prepare('SELECT is_available FROM units WHERE id = ?').get(unit_id);
+        if (!unit) return res.status(404).json({ error: "Unit not found." });
+        if (!unit.is_available) return res.status(400).json({ error: "Address unit is unavailable." });
 
-        // 3. Check if this specific TNA already has a row in the bindings table
-        const existingRow = db.prepare('SELECT id, is_active FROM bindings WHERE tna_id = ?').get(tna.id);
+        const performBinding = db.transaction(() => {
+            // A. Mark unit as occupied
+            db.prepare('UPDATE units SET is_available = 0 WHERE id = ?').run(unit_id);
+            
+            // B. Clean up any existing binding for this TNA
+            db.prepare('DELETE FROM bindings WHERE tna_id = ?').run(tna.id);
+            
+            // C. Create New Binding
+            db.prepare('INSERT INTO bindings (tna_id, unit_id, is_active) VALUES (?, ?, 1)').run(tna.id, unit_id);
+            
+            // D. Record One-Time Fee - Fixed with single quotes
+            db.prepare("INSERT INTO transactions (user_id, amount, type) VALUES (?, 5.00, 'LINK_FEE')").run(userId);
+            
+            // E. Audit Log entry - Fixed with single quotes
+            db.prepare("INSERT INTO master_log (user_id, action_type, metadata) VALUES (?, 'BIND', ?)")
+              .run(userId, JSON.stringify({ tna_code, unit_id, fee: 5.00 }));
+        });
 
-        if (existingRow) {
-            // If the TNA is already active elsewhere, we should stop them 
-            // (A visitor must unlink from Old Address before linking to New Address)
-            if (existingRow.is_active === 1) {
-                return res.status(400).json({ error: "This TNA is already active at another address. Unlink first." });
-            }
-
-            // 4. REACTIVATE: TNA was unlinked previously, so we update the existing UNIQUE row
-            db.prepare(`
-                UPDATE bindings 
-                SET variant_id = ?, is_active = 1, start_date = CURRENT_TIMESTAMP 
-                WHERE tna_id = ?
-            `).run(variant_id, tna.id);
-        } else {
-            // 5. INSERT: Brand new TNA linking for the first time
-            db.prepare(`
-                INSERT INTO bindings (tna_id, variant_id, is_active) 
-                VALUES (?, ?, 1)
-            `).run(tna.id, variant_id);
-        }
-
-        res.status(201).json({ message: "TNA Linked Successfully!" });
+        performBinding();
+        res.status(201).json({ message: "TNA Linked Successfully (Fee Processed)." });
     } catch (err) {
-        console.error("Link Error:", err);
-        res.status(500).json({ error: "Database error during binding." });
+        console.error("Binding Error:", err);
+        res.status(500).json({ error: "Binding failed due to internal error." });
     }
 };
 
-// 2. Remove a Binding (Unlink) with Transit-Lock 
-const unlinkBinding = (req, res) => {
-    const tna_code = req.body.tna_code ? req.body.tna_code.trim().toUpperCase() : "";
+exports.unlinkBinding = (req, res) => {
+    const { tna_code } = req.body;
+    const visitor_id = req.user.id;
 
     try {
-        const tna = db.prepare('SELECT id FROM tnas WHERE tna_code = ?').get(tna_code);
-        if (!tna) return res.status(404).json({ error: "TNA code not recognized." });
+        const tna = db.prepare('SELECT id FROM tnas WHERE tna_code = ? AND visitor_id = ?').get(tna_code, visitor_id);
+        
+        if (!tna) {
+            return res.status(404).json({ error: 'TNA not found or unauthorized.' });
+        }
 
-        // TRANSIT-LOCK
+        // TRANSIT-LOCK CHECK
         const activeShipment = db.prepare(`
-            SELECT tracking_number FROM shipments
-            WHERE tna_id = ? AND status = 'IN_TRANSIT'
+            SELECT tracking_number FROM shipments 
+            WHERE tna_id = ? AND status IN ('PENDING', 'IN_TRANSIT')
         `).get(tna.id);
 
         if (activeShipment) {
-            return res.status(403).json({
-                error: `Unlinking blocked. Shipment ${activeShipment.tracking_number} is in-transit.`
-            }); 
+            return res.status(403).json({ 
+                error: 'Operations Active: Cannot unlink address while a shipment is in transit.' 
+            });
         }
 
-        // SOFT DELETE (Sets is_active to 0)
-        const stmt = db.prepare('UPDATE bindings SET is_active = 0 WHERE tna_id = ?');
-        const info = stmt.run(tna.id);
-
-        if (info.changes === 0) {
-            return res.status(404).json({ error: 'No active binding found for this TNA.' });
-        }
-
-        res.json({ message: 'Address unlinked successfully.' });
+        const performUnlink = db.transaction(() => {
+            const currentBinding = db.prepare('SELECT unit_id FROM bindings WHERE tna_id = ? AND is_active = 1').get(tna.id);
             
+            if (currentBinding) {
+                db.prepare('UPDATE units SET is_available = 1 WHERE id = ?').run(currentBinding.unit_id);
+                db.prepare('UPDATE bindings SET is_active = 0 WHERE tna_id = ?').run(tna.id);
+                
+                // Audit Log entry - Fixed with single quotes
+                db.prepare("INSERT INTO master_log (user_id, action_type, metadata) VALUES (?, 'UNLINK', ?)")
+                  .run(visitor_id, JSON.stringify({ tna_code }));
+            }
+        });
+
+        performUnlink();
+        return res.status(200).json({ message: 'Address unlinked successfully.' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Unlinking process failed.' });
+        console.error("Unlink Error:", err);
+        return res.status(500).json({ error: 'Internal server error during unlinking.' });
     }
 };
-
-module.exports = { createBinding, unlinkBinding };

@@ -1,26 +1,36 @@
+const { db } = require('../config/db');
+
 /**
- * handles creating the users(Visitor, Owner or Carrier), 
- * complex Login skipped; just use an id_number.
+ * Get Personal Profile
+ * Returns the data entered during Figma-based registration.
  */
-
-const {db} = require('../config/db');
-
-// Create a new person (Visitor, Owner, Carrier)
-const createPerson = (req, res) => {
-    const {name, role, id_number} = req.body;  
+const getMyProfile = (req, res) => {
+    const userId = req.user.id;
     try {
-        const stmt = db.prepare('INSERT INTO persons (name, role, id_number) VALUES (?, ?, ?)');
-        const info = stmt.run(name, role, id_number);
-        res.status(201).json({id: info.lastInsertRowid, message:"Person created successfully"});
-    } catch(err) {
-        res.status(400).json({error: "Id Number already exists or invalid data"});
-    }
-}
+        const user = db.prepare(`
+            SELECT name, email, role, document_number, document_type, mobile, created_at 
+            FROM persons WHERE id = ?
+        `).get(userId);
 
-// get all persons (for testing dashboard) 
-const getAllPersons = (req,res) => {
-    const rows = db.prepare('SELECT * FROM persons').all();
-    res.json(rows);
+        if (!user) return res.status(404).json({ error: "User not found." });
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch profile." });
+    }
 };
 
-module.exports = {createPerson, getAllPersons}
+/**
+ * Admin: Get All Persons
+ * Useful for the "System Admin" to monitor the 10-day project progress.
+ */
+const getAllPersons = (req, res) => {
+    try {
+        const rows = db.prepare('SELECT id, name, role, email FROM persons').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: "Access denied." });
+    }
+};
+
+module.exports = { getMyProfile, getAllPersons };

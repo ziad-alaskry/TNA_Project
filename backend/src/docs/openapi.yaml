@@ -1,0 +1,313 @@
+openapi: 3.0.0
+info:
+  title: Project A - Cognitive Bias Explorer API
+  version: 1.0.0
+  description: API for managing Temporary Network Addresses (TNA)
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name: { type: string, example: "John Doe" }
+        email: { type: string, example: "visitor@test.com" }
+        password: { type: string, example: "password123" }
+        role: { type: string, enum: [VISITOR, OWNER, CARRIER], example: "VISITOR" }
+        mobile: { type: string, example: "+966500000000" }
+    
+    LinkRequest:
+      type: object
+      required: [tna_code, unit_id]
+      properties:
+        tna_code: { type: string, example: "TNA-XXXX1234" }
+        unit_id: { type: integer, example: 1 }
+
+    UnlinkRequest:
+      type: object
+      required: [tna_code]
+      properties:
+        tna_code: { type: string, example: "TNA-XXXX1234" }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new person
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        201:
+          description: Created
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login to get JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, example: "visitor@test.com" }
+                password: { type: string, example: "password123" }
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+
+  /tna/request:
+    post:
+      tags: [TNA]
+      summary: Request a new TNA (Limit 5)
+      responses:
+        201:
+          description: TNA Created
+        400:
+          description: Limit Reached
+
+  /bindings/link:
+    post:
+      tags: [Bindings]
+      summary: Link a TNA to a physical Unit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkRequest'
+      responses:
+        200:
+          description: Linked successfully
+
+  /bindings/unlink:
+    post:
+      tags: [Bindings]
+      summary: Unlink TNA (Transit-Lock protected)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnlinkRequest'
+      responses:
+        200:
+          description: Unlinked successfully
+        403:
+          description: Operations Active (Locked)
+
+  /resolve:
+    post:
+      tags: [Resolution]
+      summary: Resolve TNA (Carrier Only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tna_code]
+              properties:
+                tna_code: { type: string, example: "TNA-XXXX1234" }
+      responses:
+        200:
+          description: TNA Resolved
+
+  /tna/my-tnas:
+    get:
+      tags: [TNA]
+      summary: Get active TNAs for visitor
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of TNAs
+  /tna/my-summary:
+    get:
+      tags: [TNA]
+      summary: Get TNAs with linking status and expiration dates
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Summary of TNAs with linking status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    tna_code:
+                      type: string
+                      example: "TNA-XXXX1234"
+                    status:
+                      type: string
+                      example: "ACTIVE"
+                    linking_status:
+                      type: string
+                      enum: [Linked, Not Linked]
+                      example: "Linked"
+                    expires_at:
+                      type: string
+                      format: date-time
+                    linked_address:
+                      type: object
+                      nullable: true
+                      properties:
+                        unit:
+                          type: string
+                          example: "UNIT-101"
+                        address:
+                          type: string
+                          example: "123 Tech Tower"
+                        city:
+                          type: string
+                          example: "Riyadh"
+                        region:
+                          type: string
+                          example: "Central"
+  /marketplace/search:
+    get:
+      tags: [Marketplace]
+      summary: Search units in marketplace
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: query
+          schema:
+            type: string
+          description: Search term
+      responses:
+        200:
+          description: Search results
+  /dashboard/visitor:
+    get:
+      tags: [Dashboard]
+      summary: Visitor dashboard stats
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Dashboard data
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get user profile
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Profile data
+  /logs:
+    get:
+      tags: [Logs]
+      summary: Get master logs
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Logs data
+  /addresses/register:
+    post:
+      tags: [Owner]
+      summary: Register address variant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                base_address:
+                  type: string
+                city:
+                  type: string
+                region:
+                  type: string
+      responses:
+        201:
+          description: Address registered
+  /addresses/my-properties:
+    get:
+      tags: [Owner]
+      summary: Get owner's properties
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of properties
+  /payments/subscribe:
+    post:
+      tags: [Owner]
+      summary: Process subscription payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan_id:
+                  type: string
+      responses:
+        200:
+          description: Payment processed
+  /shipments/update:
+    post:
+      tags: [Carrier]
+      summary: Update shipment status
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shipment_id:
+                  type: integer
+                status:
+                  type: string
+      responses:
+        200:
+          description: Shipment updated
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Get all users (Gov)
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of users

@@ -1,0 +1,34 @@
+{
+	"info": {
+		"name": "Project TNA ",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{ "name": "Register User", "request": { "method": "POST", "url": "{{base_url}}/auth/register" } },
+				{ "name": "Login", "request": { "method": "POST", "url": "{{base_url}}/auth/login" } }
+			]
+		},
+		{
+			"name": "Visitor Operations",
+			"item": [
+				{ "name": "Request TNA", "request": { "method": "POST", "url": "{{base_url}}/tna/request" } },
+				{ "name": "Search Units", "request": { "method": "GET", "url": "{{base_url}}/marketplace/search?city=Riyadh" } },
+				{ "name": "Link TNA to Unit", "request": { "method": "POST", "url": "{{base_url}}/bindings/link" } }
+			]
+		},
+		{
+			"name": "Carrier Operations",
+			"item": [
+				{ "name": "Resolve TNA", "request": { "method": "POST", "url": "{{base_url}}/resolve" } },
+				{ "name": "Update Shipment (Lock)", "request": { "method": "POST", "url": "{{base_url}}/shipments/update" } }
+			]
+		}
+	],
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:3000/api/v1" },
+		{ "key": "token", "value": "" }
+	]
+}
