@@ -20,6 +20,8 @@ const { authorize } = require('../middleware/authMiddleware');
 // ==========================================
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+router.post('/auth/send-otp', authController.sendOtp);
+router.post('/auth/verify-security-code', authController.verifySecurityCode);
 
 // ==========================================
 // 2. VISITOR ROUTES
@@ -47,7 +49,7 @@ router.post('/addresses/register', authorize(['OWNER']), addressController.regis
 router.get('/addresses/my-properties', authorize(['OWNER']), addressController.getMyProperties);
 
 // Monetization
-router.post('/payments/subscribe', authorize(['OWNER']), paymentController.processPayment);
+router.post('/payments/subscribe', authorize(['OWNER', 'VISITOR']), paymentController.processPayment);
 
 // ==========================================
 // 4. CARRIER & SYSTEM ROUTES

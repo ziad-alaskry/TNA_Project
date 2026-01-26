@@ -80,6 +80,70 @@ paths:
                 properties:
                   token: { type: string }
 
+  /auth/send-otp:
+    post:
+      tags: [Auth]
+      summary: Send OTP to user's email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, example: "visitor@test.com" }
+      responses:
+        200:
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  expiresIn: { type: string }
+        404:
+          description: User not found
+        500:
+          description: Failed to send OTP
+
+  /auth/verify-security-code:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email: { type: string, example: "visitor@test.com" }
+                otp: { type: string, example: "123456" }
+      responses:
+        200:
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  token: { type: string }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      role: { type: string }
+        400:
+          description: Invalid or expired OTP
+        401:
+          description: Invalid security code
+
+
   /tna/request:
     post:
       tags: [TNA]
@@ -266,7 +330,8 @@ paths:
           description: List of properties
   /payments/subscribe:
     post:
-      tags: [Owner]
+      tags: [Payments]
+      summary: Process payment (Owner/Visitor)
       summary: Process subscription payment
       security:
         - bearerAuth: []
